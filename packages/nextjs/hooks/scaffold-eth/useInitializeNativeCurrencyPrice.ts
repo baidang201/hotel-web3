@@ -1,32 +1,34 @@
-import { useCallback, useEffect } from "react";
-import { useTargetNetwork } from "./useTargetNetwork";
-import { useInterval } from "usehooks-ts";
-import scaffoldConfig from "~~/scaffold.config";
+import { useEffect } from "react";
 import { useGlobalState } from "~~/services/store/store";
-import { fetchPriceFromUniswap } from "~~/utils/scaffold-eth";
+import scaffoldConfig from "~~/scaffold.config";
+import { useTargetNetwork } from "./useTargetNetwork";
 
-const enablePolling = false;
-
-/**
- * Get the price of Native Currency based on Native Token/DAI trading pair from Uniswap SDK
- */
 export const useInitializeNativeCurrencyPrice = () => {
   const setNativeCurrencyPrice = useGlobalState(state => state.setNativeCurrencyPrice);
-  const setIsNativeCurrencyFetching = useGlobalState(state => state.setIsNativeCurrencyFetching);
   const { targetNetwork } = useTargetNetwork();
 
-  const fetchPrice = useCallback(async () => {
-    setIsNativeCurrencyFetching(true);
-    const price = await fetchPriceFromUniswap(targetNetwork);
-    setNativeCurrencyPrice(price);
-    setIsNativeCurrencyFetching(false);
-  }, [setIsNativeCurrencyFetching, setNativeCurrencyPrice, targetNetwork]);
-
-  // Get the price of ETH from Uniswap on mount
   useEffect(() => {
-    fetchPrice();
-  }, [fetchPrice]);
+    if (scaffoldConfig.disableEthPriceQuery) {
+      setNativeCurrencyPrice(1);
+      return;
+    }
 
-  // Get the price of ETH from Uniswap at a given interval
-  useInterval(fetchPrice, enablePolling ? scaffoldConfig.pollingInterval : null);
+    const fetchPrice = async () => {
+      try {
+        // 在本地测试网络中使用默认值
+        if (targetNetwork.id === 31337) {
+          setNativeCurrencyPrice(1);
+          return;
+        }
+
+        // 其他网络的价格查询逻辑...
+        // 这里可以添加实际的价格查询代码
+      } catch (error) {
+        console.warn("Error fetching ETH price:", error);
+        setNativeCurrencyPrice(1);
+      }
+    };
+
+    fetchPrice();
+  }, [setNativeCurrencyPrice, targetNetwork]);
 };

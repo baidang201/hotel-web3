@@ -1,53 +1,35 @@
 import { useMemo } from "react";
-import { usePublicClient, useWalletClient } from "wagmi";
+import { usePublicClient, useChainId } from "wagmi";
 import scaffoldConfig from "~~/scaffold.config";
 
 type TargetNetwork = {
   id: number;
   name: string;
-  network: string;
-  nativeCurrency: {
-    name: string;
-    symbol: string;
-    decimals: number;
-  };
-  rpcUrls: {
-    default: {
-      http: string[];
-    };
-    public: {
-      http: string[];
-    };
-  };
-  blockExplorers?: {
-    default: {
-      name: string;
-      url: string;
-    };
-  };
   color?: string;
+  network: string;
 };
 
 export function useTargetNetwork() {
+  const chainId = useChainId();
   const publicClient = usePublicClient();
-  const { data: walletClient } = useWalletClient();
 
   const targetNetwork = useMemo((): TargetNetwork => {
     const configuredNetwork = scaffoldConfig.targetNetworks[0];
     return {
-      ...configuredNetwork,
-      color: "#1E40AF",
+      id: configuredNetwork.id,
+      name: configuredNetwork.name,
+      network: configuredNetwork.network,
+      color: "#1E40AF", // 默认颜色
     };
   }, []);
 
   const isTargetNetwork = useMemo(() => {
-    return walletClient?.chain.id === targetNetwork.id;
-  }, [walletClient, targetNetwork]);
+    return chainId === targetNetwork.id;
+  }, [chainId, targetNetwork]);
 
   return {
     targetNetwork,
     isTargetNetwork,
     publicClient,
-    walletClient,
   };
 }

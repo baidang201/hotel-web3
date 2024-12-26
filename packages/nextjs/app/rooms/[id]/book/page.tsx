@@ -31,20 +31,34 @@ export default function BookingPage({ params }: BookingPageProps) {
     functionName: "bookRoom",
     args: [
       BigInt(params.id),
-      BigInt(new Date(checkIn).getTime() / 1000),
-      BigInt(new Date(checkOut).getTime() / 1000),
+      BigInt(Math.ceil((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / (1000 * 60 * 60 * 24)))
     ],
-    value: room ? room.pricePerNight * BigInt(
+    value: room ? room.price * BigInt(
       Math.ceil((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / (1000 * 60 * 60 * 24))
     ) : BigInt(0),
   });
 
   const handleBooking = async () => {
     try {
-      await bookRoom();
-      router.push("/bookings"); // 预订成功后跳转到预订记录页
-    } catch (error) {
+      if (!checkIn || !checkOut) {
+        throw new Error("请选择入住和退房日期");
+      }
+
+      const checkInDate = new Date(checkIn);
+      const checkOutDate = new Date(checkOut);
+      const days = Math.ceil((checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (days <= 0) {
+        throw new Error("退房日期必须晚于入住日期");
+      }
+
+      const tx = await bookRoom();
+      console.log("预订交易:", tx);
+      
+      router.push("/bookings");
+    } catch (error: any) {
       console.error("预订失败:", error);
+      // 这里可以添加错误提示UI
     }
   };
 

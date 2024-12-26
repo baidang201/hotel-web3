@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { parseEther } from "viem";
-import { useAccount } from "wagmi";
+import { parseEther, getContract } from "viem";
+import { useAccount, usePublicClient } from "wagmi";
 import { Address } from "~~/components/scaffold-eth";
-import { useScaffoldContractWrite } from "~~/hooks/scaffold-eth";
+import { useScaffoldContractWrite, useDeployedContractInfo } from "~~/hooks/scaffold-eth";
+import { useTargetNetwork } from "~~/hooks/scaffold-eth";
 
 enum RoomLevel {
   NORMAL,
@@ -14,29 +15,102 @@ enum RoomLevel {
 }
 
 export default function AdminPage() {
-  const { address: connectedAddress } = useAccount();
+  const { address: connectedAddress, isConnected } = useAccount();
+  const { targetNetwork, isTargetNetwork } = useTargetNetwork();
+  const publicClient = usePublicClient();
   
+  const { data: contractInfo } = useDeployedContractInfo({
+    contractName: "HotelBooking",
+  });
+
+  console.log("Contract Info:", contractInfo);
+
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [pricePerNight, setPricePerNight] = useState("");
   const [level, setLevel] = useState<RoomLevel>(RoomLevel.NORMAL);
 
-  const { writeAsync: createRoom } = useScaffoldContractWrite({
+  const { write: createRoom, isLoading, error: writeError } = useScaffoldContractWrite({
     contractName: "HotelBooking",
     functionName: "createRoom",
-    args: [name, description, parseEther(pricePerNight || "0"), level],
+    args: [
+      name,
+      description,
+      parseEther(pricePerNight || "0"),
+      BigInt(level)
+    ],
+    onError: (error) => {
+      console.error("Contract write error:", error);
+    },
+    onSuccess: (tx) => {
+      console.log("Transaction submitted:", tx);
+    },
   });
 
   const handleCreateRoom = async () => {
     try {
-      await createRoom();
-      // 清空表单
-      setName("");
-      setDescription("");
-      setPricePerNight("");
-      setLevel(RoomLevel.NORMAL);
-    } catch (error) {
+      if (!isConnected) {
+        throw new Error("请先连接钱包");
+      }
+
+      if (!isTargetNetwork) {
+        throw new Error("请切换到正确的网络");
+      }
+
+      if (!contractInfo?.address) {
+        throw new Error("合约未部署");
+      }
+
+      if (!name || !description || !pricePerNight) {
+        throw new Error("请填写所有必填字段");
+      }
+
+      // 检查是否是合约所有者
+      try {
+        const owner = await publicClient.readContract({
+          address: contractInfo.address,
+          abi: contractInfo.abi,
+          functionName: 'owner',
+        });
+
+        console.log("Contract owner:", owner);
+        console.log("Connected address:", connectedAddress);
+        
+        if (!owner || !connectedAddress || owner.toLowerCase() !== connectedAddress.toLowerCase()) {
+          throw new Error("只有合约所有者才能创建房间");
+        }
+
+        const params = {
+          name,
+          description,
+          price: parseEther(pricePerNight || "0").toString(),
+          level: BigInt(level).toString()
+        };
+        
+        console.log("Creating room with params:", params);
+        console.log("Contract address:", contractInfo?.address);
+        console.log("Connected wallet:", connectedAddress);
+        console.log("Contract owner:", owner);
+        console.log("Current network:", targetNetwork.name);
+
+        const result = await createRoom();
+        console.log("Transaction result:", result);
+
+        if (result?.receipt) {
+          setName("");
+          setDescription("");
+          setPricePerNight("");
+          setLevel(RoomLevel.NORMAL);
+        }
+
+      } catch (error: any) {
+        console.error("Transaction failed:", error);
+        throw error;
+      }
+
+    } catch (error: any) {
       console.error("创建房间失败:", error);
+      alert(`创建房间失败: ${error.message}`);
     }
   };
 
@@ -44,7 +118,16 @@ export default function AdminPage() {
     <div className="flex flex-col py-8 px-4 gap-6">
       <div className="flex justify-between items-center">
         <h1 className="text-4xl font-bold">管理后台</h1>
-        <Address address={connectedAddress} />
+        <div className="flex flex-col items-end gap-2">
+          <Address address={connectedAddress} />
+          <span className="text-sm">
+            {isConnected 
+              ? isTargetNetwork 
+                ? `当前网络: ${targetNetwork.name}`
+                : "请切换网络"
+              : "请连接钱包"}
+          </span>
+        </div>
       </div>
 
       <div className="card bg-base-100 shadow-xl">
@@ -107,9 +190,22 @@ export default function AdminPage() {
             <button 
               className="btn btn-primary"
               onClick={handleCreateRoom}
-              disabled={!name || !description || !pricePerNight}
+              disabled={
+                !name || 
+                !description || 
+                !pricePerNight || 
+                !isConnected || 
+                !isTargetNetwork ||
+                isLoading
+              }
             >
-              创建房间
+              {isLoading 
+                ? "处理中..." 
+                : !isConnected 
+                  ? "请连接钱包" 
+                  : !isTargetNetwork 
+                    ? "请切换网络" 
+                    : "创建房间"}
             </button>
           </div>
         </div>

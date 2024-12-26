@@ -30,9 +30,15 @@ interface Room {
 export default function RoomsPage() {
   const { address: connectedAddress } = useAccount();
   
-  const { data: availableRooms } = useScaffoldContractRead({
+  const { data: rooms } = useScaffoldContractRead({
     contractName: "HotelBooking",
     functionName: "getAvailableRooms",
+  });
+
+  const { data: roomDetails } = useScaffoldContractRead({
+    contractName: "HotelBooking",
+    functionName: "getRoom",
+    args: [BigInt(roomId)],  // 如果需要获取具体房间信息
   });
 
   const getRoomLevelString = (level: RoomLevel) => {
@@ -61,7 +67,7 @@ export default function RoomsPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {availableRooms?.map((room: Room) => (
+        {rooms?.map((room: Room) => (
           <div key={room.id.toString()} className="card bg-base-100 shadow-xl">
             <div className="card-body">
               <h2 className="card-title">{room.name}</h2>

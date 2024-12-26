@@ -1,9 +1,8 @@
-import { useContractWrite, useChainId } from 'wagmi';
+import { useContractWrite, useWalletClient, useAccount, useChainId, usePublicClient } from 'wagmi';
 import { useDeployedContractInfo } from './useDeployedContractInfo';
 import { useTargetNetwork } from './useTargetNetwork';
 import { ContractAbi, ContractName, UseScaffoldWriteConfig } from '~~/utils/scaffold-eth/contract';
 import { getParsedError } from '~~/utils/scaffold-eth';
-import { notification } from '~~/utils/scaffold-eth';
 
 export const useScaffoldContractWrite = <
   TContractName extends ContractName,
@@ -13,60 +12,84 @@ export const useScaffoldContractWrite = <
   functionName,
   args,
   value,
-  onBlockConfirmation,
-  blockConfirmations = 1,
+  onError,
+  onSuccess,
   ...writeConfig
 }: UseScaffoldWriteConfig<TContractName, TFunctionName>) => {
   const { data: deployedContractData } = useDeployedContractInfo(contractName);
-  const { targetNetwork } = useTargetNetwork();
+  const { data: walletClient } = useWalletClient();
+  const publicClient = usePublicClient();
+  const { address } = useAccount();
   const chainId = useChainId();
+  const { targetNetwork } = useTargetNetwork();
 
-  const { write, data, isLoading, isError, error } = useContractWrite({
-    chainId: targetNetwork.id,
-    address: deployedContractData?.address,
-    abi: deployedContractData?.abi as ContractAbi<TContractName>,
-    functionName,
-    args,
-    value,
-    ...writeConfig,
-  });
-
-  const handleWrite = async () => {
-    if (!chainId) {
-      notification.error("Please connect your wallet");
-      return;
-    }
-    if (chainId !== targetNetwork.id) {
-      notification.error("Please switch to the correct network");
-      return;
-    }
-
-    if (!write) {
-      notification.error("Failed to prepare contract write");
-      return;
-    }
-
+  const write = async () => {
     try {
-      const tx = await write();
-      
-      if (onBlockConfirmation) {
-        const receipt = await tx.wait(blockConfirmations);
-        onBlockConfirmation(receipt);
+      if (!deployedContractData?.address) {
+        console.error("Contract not deployed");
+        throw new Error("合约未部署");
       }
-      
-      return tx;
+
+      if (!address) {
+        console.error("No wallet connected");
+        throw new Error("请先连接钱包");
+      }
+
+      if (chainId !== targetNetwork.id) {
+        console.error("Wrong network", { current: chainId, target: targetNetwork.id });
+        throw new Error("请切换到正确的网络");
+      }
+
+      if (!walletClient) {
+        throw new Error("钱包客户端未初始化");
+      }
+
+      // 准备交易参数
+      const config = {
+        account: address,
+        address: deployedContractData.address,
+        abi: deployedContractData.abi,
+        functionName,
+        args,
+        value,
+        chainId: targetNetwork.id,
+      };
+
+      console.log("Preparing transaction with config:", config);
+
+      try {
+        // 使用 publicClient 准备交易
+        const { request } = await publicClient.simulateContract(config);
+        console.log("Transaction simulation successful");
+
+        // 执行交易
+        const hash = await walletClient.writeContract(request);
+        console.log("Transaction hash:", hash);
+
+        // 等待交易确认
+        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        console.log("Transaction receipt:", receipt);
+
+        onSuccess?.({ hash });
+        return { hash, receipt };
+      } catch (error: any) {
+        console.error("Transaction failed:", error);
+        throw new Error(error.message || "交易失败");
+      }
+
     } catch (e: any) {
       const message = getParsedError(e);
-      notification.error(message);
+      console.error("Contract write error:", message);
+      onError?.(e);
       throw e;
     }
   };
 
   return {
-    writeAsync: handleWrite,
-    data,
-    isLoading,
-    isError,
-    error,
+    write,
+    isLoading: false,
+    isError: false,
+    error: null,
+    status: 'idle',
   };
 }; 
