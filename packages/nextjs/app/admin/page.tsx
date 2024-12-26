@@ -54,7 +54,7 @@ export default function AdminPage() {
       }
 
       if (!isTargetNetwork) {
-        throw new Error("请切换到正确的网络");
+        throw new Error("请切换到本地网络");
       }
 
       if (!contractInfo?.address) {
@@ -65,7 +65,6 @@ export default function AdminPage() {
         throw new Error("请填写所有必填字段");
       }
 
-      // 检查是否是合约所有者
       try {
         const owner = await publicClient.readContract({
           address: contractInfo.address,
@@ -73,25 +72,18 @@ export default function AdminPage() {
           functionName: 'owner',
         });
 
-        console.log("Contract owner:", owner);
-        console.log("Connected address:", connectedAddress);
-        
         if (!owner || !connectedAddress || owner.toLowerCase() !== connectedAddress.toLowerCase()) {
           throw new Error("只有合约所有者才能创建房间");
         }
 
-        const params = {
+        console.log("Creating room...", {
           name,
           description,
           price: parseEther(pricePerNight || "0").toString(),
-          level: BigInt(level).toString()
-        };
-        
-        console.log("Creating room with params:", params);
-        console.log("Contract address:", contractInfo?.address);
-        console.log("Connected wallet:", connectedAddress);
-        console.log("Contract owner:", owner);
-        console.log("Current network:", targetNetwork.name);
+          level: BigInt(level).toString(),
+          owner,
+          connectedAddress,
+        });
 
         const result = await createRoom();
         console.log("Transaction result:", result);
@@ -101,6 +93,7 @@ export default function AdminPage() {
           setDescription("");
           setPricePerNight("");
           setLevel(RoomLevel.NORMAL);
+          alert("房间创建成功！");
         }
 
       } catch (error: any) {

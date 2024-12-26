@@ -2,30 +2,16 @@ import { useMemo } from "react";
 import { usePublicClient, useChainId } from "wagmi";
 import scaffoldConfig from "~~/scaffold.config";
 
-type TargetNetwork = {
-  id: number;
-  name: string;
-  color?: string;
-  network: string;
-};
-
 export function useTargetNetwork() {
   const chainId = useChainId();
   const publicClient = usePublicClient();
 
-  const targetNetwork = useMemo((): TargetNetwork => {
-    const configuredNetwork = scaffoldConfig.targetNetworks[0];
-    return {
-      id: configuredNetwork.id,
-      name: configuredNetwork.name,
-      network: configuredNetwork.network,
-      color: "#1E40AF", // 默认颜色
-    };
+  const targetNetwork = useMemo(() => {
+    // 在本地开发时总是使用 hardhat 网络
+    return scaffoldConfig.targetNetworks[0];
   }, []);
 
-  const isTargetNetwork = useMemo(() => {
-    return chainId === targetNetwork.id;
-  }, [chainId, targetNetwork]);
+  const isTargetNetwork = chainId === targetNetwork.id;
 
   return {
     targetNetwork,

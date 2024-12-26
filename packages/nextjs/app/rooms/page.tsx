@@ -1,56 +1,64 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
+import Link from "next/link";
 import { formatEther } from "viem";
-import { useAccount } from "wagmi";
-import { Address } from "~~/components/scaffold-eth";
 import { useScaffoldContractRead } from "~~/hooks/scaffold-eth";
 
-enum RoomLevel {
-  NORMAL,
-  GOLD,
-  PLATINUM,
-  DIAMOND
-}
-
-enum RoomStatus {
-  AVAILABLE,
-  BOOKED
-}
-
-interface Room {
-  id: bigint;
+type Room = {
+  price: bigint;
+  level: number;
+  status: number;
   name: string;
-  pricePerNight: bigint;
-  level: RoomLevel;
-  status: RoomStatus;
   description: string;
-}
+};
 
 export default function RoomsPage() {
-  const { address: connectedAddress } = useAccount();
-  
-  const { data: rooms } = useScaffoldContractRead({
+  const [roomDetails, setRoomDetails] = useState<(Room | null)[]>([]);
+
+  // 获取房间总数
+  const { data: roomCount } = useScaffoldContractRead({
     contractName: "HotelBooking",
-    functionName: "getAvailableRooms",
+    functionName: "getRoomCount",
   });
 
-  const { data: roomDetails } = useScaffoldContractRead({
+  // 获取所有房间信息
+  const { data: room0 } = useScaffoldContractRead({
     contractName: "HotelBooking",
     functionName: "getRoom",
-    args: [BigInt(roomId)],  // 如果需要获取具体房间信息
+    args: [BigInt(0)],
   });
 
-  const getRoomLevelString = (level: RoomLevel) => {
-    switch(level) {
-      case RoomLevel.NORMAL:
+  const { data: room1 } = useScaffoldContractRead({
+    contractName: "HotelBooking",
+    functionName: "getRoom",
+    args: [BigInt(1)],
+  });
+
+  const { data: room2 } = useScaffoldContractRead({
+    contractName: "HotelBooking",
+    functionName: "getRoom",
+    args: [BigInt(2)],
+  });
+
+  useEffect(() => {
+    if (roomCount) {
+      const count = Number(roomCount);
+      const rooms = [room0, room1, room2].slice(0, count);
+      setRoomDetails(rooms);
+    }
+  }, [roomCount, room0, room1, room2]);
+
+  const getRoomLevel = (level: number) => {
+    switch (level) {
+      case 0:
         return "普通";
-      case RoomLevel.GOLD:
+      case 1:
         return "黄金";
-      case RoomLevel.PLATINUM:
+      case 2:
         return "白金";
-      case RoomLevel.DIAMOND:
-        return "铂金";
+      case 3:
+        return "钻石";
       default:
         return "未知";
     }
@@ -59,41 +67,42 @@ export default function RoomsPage() {
   return (
     <div className="flex flex-col py-8 px-4 gap-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-4xl font-bold">可用房间</h1>
-        <div className="flex items-center gap-2">
-          <span>当前账户:</span>
-          <Address address={connectedAddress} />
-        </div>
+        <h1 className="text-4xl font-bold">房间列表</h1>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {rooms?.map((room: Room) => (
-          <div key={room.id.toString()} className="card bg-base-100 shadow-xl">
-            <div className="card-body">
-              <h2 className="card-title">{room.name}</h2>
-              <p>{room.description}</p>
-              <div className="flex justify-between items-center mt-4">
-                <div>
-                  <p className="text-sm">等级: {getRoomLevelString(room.level)}</p>
-                  <p className="text-lg font-bold">
-                    {formatEther(room.pricePerNight)} ETH/晚
-                  </p>
-                </div>
-                <div className="card-actions justify-end">
-                  <button 
-                    className="btn btn-primary"
-                    onClick={() => {
-                      // TODO: 跳转到预订页面
-                    }}
-                  >
-                    预订
-                  </button>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {roomDetails.map((room, index) => 
+          room && (
+            <div key={index} className="card bg-base-100 shadow-xl">
+              <div className="card-body">
+                <h2 className="card-title">{room.name}</h2>
+                <p>{room.description}</p>
+                <div className="flex justify-between items-center mt-4">
+                  <div>
+                    <p className="text-sm">等级: {getRoomLevel(room.level)}</p>
+                    <p className="text-sm">价格: {formatEther(room.price)} ETH/晚</p>
+                    <p className="text-sm">状态: {room.status === 0 ? "可预订" : "已预订"}</p>
+                  </div>
+                  {room.status === 0 && (
+                    <Link 
+                      href={`/rooms/${index}/book`}
+                      className="btn btn-primary"
+                    >
+                      预订
+                    </Link>
+                  )}
                 </div>
               </div>
             </div>
-          </div>
-        ))}
+          )
+        )}
       </div>
+
+      {roomDetails.length === 0 && (
+        <div className="text-center py-8">
+          <p>暂无房间</p>
+        </div>
+      )}
     </div>
   );
 } 
