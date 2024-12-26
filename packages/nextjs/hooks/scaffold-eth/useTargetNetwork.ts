@@ -1,32 +1,53 @@
-import { useEffect, useMemo } from "react";
-import { useAccount } from "wagmi";
+import { useMemo } from "react";
+import { usePublicClient, useWalletClient } from "wagmi";
 import scaffoldConfig from "~~/scaffold.config";
-import { useGlobalState } from "~~/services/store/store";
-import { ChainWithAttributes } from "~~/utils/scaffold-eth";
-import { NETWORKS_EXTRA_DATA } from "~~/utils/scaffold-eth";
 
-/**
- * Retrieves the connected wallet's network from scaffold.config or defaults to the 0th network in the list if the wallet is not connected.
- */
-export function useTargetNetwork(): { targetNetwork: ChainWithAttributes } {
-  const { chain } = useAccount();
-  const targetNetwork = useGlobalState(({ targetNetwork }) => targetNetwork);
-  const setTargetNetwork = useGlobalState(({ setTargetNetwork }) => setTargetNetwork);
+type TargetNetwork = {
+  id: number;
+  name: string;
+  network: string;
+  nativeCurrency: {
+    name: string;
+    symbol: string;
+    decimals: number;
+  };
+  rpcUrls: {
+    default: {
+      http: string[];
+    };
+    public: {
+      http: string[];
+    };
+  };
+  blockExplorers?: {
+    default: {
+      name: string;
+      url: string;
+    };
+  };
+  color?: string;
+};
 
-  useEffect(() => {
-    const newSelectedNetwork = scaffoldConfig.targetNetworks.find(targetNetwork => targetNetwork.id === chain?.id);
-    if (newSelectedNetwork && newSelectedNetwork.id !== targetNetwork.id) {
-      setTargetNetwork(newSelectedNetwork);
-    }
-  }, [chain?.id, setTargetNetwork, targetNetwork.id]);
+export function useTargetNetwork() {
+  const publicClient = usePublicClient();
+  const { data: walletClient } = useWalletClient();
 
-  return useMemo(
-    () => ({
-      targetNetwork: {
-        ...targetNetwork,
-        ...NETWORKS_EXTRA_DATA[targetNetwork.id],
-      },
-    }),
-    [targetNetwork],
-  );
+  const targetNetwork = useMemo((): TargetNetwork => {
+    const configuredNetwork = scaffoldConfig.targetNetworks[0];
+    return {
+      ...configuredNetwork,
+      color: "#1E40AF",
+    };
+  }, []);
+
+  const isTargetNetwork = useMemo(() => {
+    return walletClient?.chain.id === targetNetwork.id;
+  }, [walletClient, targetNetwork]);
+
+  return {
+    targetNetwork,
+    isTargetNetwork,
+    publicClient,
+    walletClient,
+  };
 }

@@ -16,11 +16,19 @@ type HeaderMenuLink = {
 
 export const menuLinks: HeaderMenuLink[] = [
   {
-    label: "Home",
+    label: "首页",
     href: "/",
   },
   {
-    label: "Debug Contracts",
+    label: "房间列表",
+    href: "/rooms",
+  },
+  {
+    label: "管理后台",
+    href: "/admin",
+  },
+  {
+    label: "调试合约",
     href: "/debug",
     icon: <BugAntIcon className="h-4 w-4" />,
   },

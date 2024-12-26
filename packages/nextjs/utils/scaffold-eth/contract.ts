@@ -180,18 +180,24 @@ export type UseScaffoldWriteConfig<TContractName extends ContractName> = {
 
 export type UseScaffoldReadConfig<
   TContractName extends ContractName,
-  TFunctionName extends ExtractAbiFunctionNames<ContractAbi<TContractName>, ReadAbiStateMutability>,
+  TFunctionName extends string,
 > = {
   contractName: TContractName;
-  chainId?: AllowedChainIds;
-  watch?: boolean;
-} & IsContractDeclarationMissing<
-  Partial<UseReadContractParameters>,
-  {
-    functionName: TFunctionName;
-  } & UseScaffoldArgsParam<TContractName, TFunctionName> &
-    Omit<UseReadContractParameters, "chainId" | "abi" | "address" | "functionName" | "args">
->;
+  functionName: TFunctionName;
+  args?: any[];
+} & Omit<UseContractReadConfig, 'abi' | 'address' | 'functionName' | 'args'>;
+
+export type UseScaffoldWriteConfig<
+  TContractName extends ContractName,
+  TFunctionName extends string,
+> = {
+  contractName: TContractName;
+  functionName: TFunctionName;
+  args?: any[];
+  value?: bigint;
+  onBlockConfirmation?: (txnReceipt: TransactionReceipt) => void;
+  blockConfirmations?: number;
+} & Omit<UseContractWriteConfig, 'abi' | 'address' | 'functionName' | 'args' | 'value'>;
 
 export type ScaffoldWriteContractVariables<
   TContractName extends ContractName,
